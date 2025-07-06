@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -86,9 +87,23 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  // /* 将代码写在BEGIN和END之间 */
-  // HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_SET);
+  /* 通过串口1发送“Hello” */
+  HAL_UART_Transmit(&huart1, (uint8_t*)"Hello", 5, 0xFF);
+
+//   /* 接收信息缓存，只接收5个字节数据 */
+//   char recv_str[10];
+//   HAL_UART_Receive(&huart1, recv_str, 5, 0xFFFFFFFF);
+
+//   /* 将接收到的信息发回给电脑 */
+//   HAL_UART_Transmit(&huart1, recv_str, 5, 0xFF);
+
+  /* 输出变量 */
+  char wave_out = 0;
+
+  /* LED计时变量 */
+  uint16_t led_time = 0;
 
   /* USER CODE END 2 */
 
@@ -96,28 +111,61 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    // /* 打印日志并输出变量, 输出“\r\n”是为了换行显示 */
+    // PrintfDebug("LED Green State %d\r\n", HAL_GPIO_ReadPin(LED_G_GPIO_Port, LED_G_Pin));
 
-    // /* 将代码写在BEGIN和END之间 */
-    // if(HAL_GPIO_ReadPin(LED_R_GPIO_Port, LED_R_Pin) == GPIO_PIN_SET) // 读引脚状态，判断是不是是高电平
-    // {
-    //     /* 引脚是高电平 */
-    //     HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_RESET); // 将引脚置为低电平
-    // }else{
-    //     /* 引脚不是高电平 */
-    //     HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_SET); // 将引脚置为高电平
-    // }
+    // /* 反转引脚状态 */
+    // HAL_GPIO_TogglePin(LED_G_GPIO_Port, LED_G_Pin);
 
-    /* 将代码写在BEGIN和END之间 */
-    if(HAL_GPIO_ReadPin(LED_R_GPIO_Port, LED_R_Pin) == GPIO_PIN_SET) // 读引脚状态，判断是不是是高电平
+    // /* 延时500ms */
+    // HAL_Delay(500);
+
+    /* LED计时到500ms状态切换一次 */
+    if(led_time >= 500)
     {
-        /* 如果引脚是高电平，就将引脚输出改为低电平 */
-        HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_RESET); // 将引脚置为低电平
-    }else{
-        /* 如果引脚是低电平，就将引脚输出改为高电平 */
-        HAL_GPIO_WritePin(LED_R_GPIO_Port, LED_R_Pin, GPIO_PIN_SET); // 将引脚置为高电平
+        led_time = 0; // 重新计时
+        /* 翻转引脚状态 */
+        HAL_GPIO_TogglePin(LED_G_GPIO_Port, LED_G_Pin);
     }
+    
+    /* 隔5ms发送一次变量点 */
+    if(wave_out >= 100)
+    {
+        /* 如果wave_out大于等于100，则输出由99 -> 0, 一个100个点 */
+        /* 通过串口1发送三角波变量数据，并增加包头包尾用于解析数据 */
+        HAL_UART_Transmit(&huart1, (uint8_t[]){0xD2, (199 - wave_out), 0xD3}, 3, 0xFF);
+    }else{
+        /* 如果wave_out小于100，则输出由0 -> 99, 一个100个点 */
+        /* 通过串口1发送三角波变量数据，并增加包头包尾用于解析数据 */
+        HAL_UART_Transmit(&huart1, (uint8_t[]){0xD2, wave_out, 0xD3}, 3, 0xFF);
+    }
+
+    /* 隔5ms发送一次变量点 */
+    if(wave_out >= 100)
+    {
+        /* 如果wave_out大于等于100，则输出由0 -> 99, 一个100个点 */
+        /* 通过串口1发送锯齿波变量数据，并增加包头包尾用于解析数据 */
+        HAL_UART_Transmit(&huart1, (uint8_t[]){0xCE, (wave_out % 100), 0xCF}, 3, 0xFF);
+    }else{
+        /* 如果wave_out小于100，则输出由0 -> 99, 一个100个点 */
+        /* 通过串口1发送锯齿波变量数据，并增加包头包尾用于解析数据 */
+        HAL_UART_Transmit(&huart1, (uint8_t[]){0xCE, wave_out, 0xCF}, 3, 0xFF);
+    }
+    
+    /**
+     * wave_out在[0, 199]循环
+     * 一个周期200个数据点，一个数据点5ms
+     * 所以波形一个周期为1000ms
+     */
+    wave_out++;
+    if(wave_out >= 200)
+    {
+        wave_out = 0;
+    }
+
     /* 保持电平状态方便观察 */
-    HAL_Delay(500); // 延时500ms，也就是0.5s，这样亮灭一个周期就是一秒
+    HAL_Delay(5); // 延时10ms
+    led_time += 5; // LED计时增加
 
     /* USER CODE END WHILE */
 
